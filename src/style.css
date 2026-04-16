@@ -167,6 +167,7 @@ body {
 
 .weapon-image {
   height: 110px;
+  width: 100px;
   border-radius: 10px;
   background: linear-gradient(to bottom, #f8f5e8, #d8d2bf);
   color: #555;

@@ -2,7 +2,7 @@ import { Ball } from './ball'
 
 const BALL_CONFIG = {
   radius: 16,
-  speed: 5,
+  speed: 260,      // 每秒移動 260 像素
   minAngle: -120,
   maxAngle: -60,
 }
@@ -11,6 +11,7 @@ let canvas = null
 let ctx = null
 let balls = []
 let animationId = null
+let lastTime = 0
 
 function createBall(canvasWidth, canvasHeight) {
   const startX = canvasWidth / 2
@@ -20,6 +21,7 @@ function createBall(canvasWidth, canvasHeight) {
     Math.random() * (BALL_CONFIG.maxAngle - BALL_CONFIG.minAngle) + BALL_CONFIG.minAngle
 
   const radian = randomAngle * Math.PI / 180
+
   const vx = Math.cos(radian) * BALL_CONFIG.speed
   const vy = Math.sin(radian) * BALL_CONFIG.speed
 
@@ -32,11 +34,18 @@ function drawBackground() {
   ctx.fillRect(0, 0, canvas.width, canvas.height)
 }
 
-function gameLoop() {
+function gameLoop(currentTime) {
+  if (!lastTime) {
+    lastTime = currentTime
+  }
+
+  const deltaTime = (currentTime - lastTime) / 1000
+  lastTime = currentTime
+
   drawBackground()
 
   for (const ball of balls) {
-    ball.update(canvas.width, canvas.height)
+    ball.update(canvas.width, canvas.height, deltaTime)
     ball.draw(ctx)
   }
 
@@ -66,7 +75,8 @@ export function initGame(ballCount = 1) {
     cancelAnimationFrame(animationId)
   }
 
-  gameLoop()
+  lastTime = 0
+  animationId = requestAnimationFrame(gameLoop)
 }
 
 export function addOneBall() {

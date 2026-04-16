@@ -12,9 +12,9 @@ export class Ball {
     this.vy = vy
   }
 
-  update(canvasWidth, canvasHeight) {
-    this.x += this.vx
-    this.y += this.vy
+  update(canvasWidth, canvasHeight, deltaTime) {
+    this.x += this.vx * deltaTime
+    this.y += this.vy * deltaTime
 
     if (this.x - this.radius <= 0) {
       this.x = this.radius
@@ -44,17 +44,14 @@ export class Ball {
 
     ctx.save()
 
-    // 先裁成圓形
     ctx.beginPath()
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2)
     ctx.closePath()
     ctx.clip()
 
     if (ballImage.complete && ballImage.naturalWidth > 0) {
-      // 把圖片畫進圓形裡
       ctx.drawImage(ballImage, drawX, drawY, size, size)
     } else {
-      // 圖片還沒好時先畫白球
       ctx.beginPath()
       ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2)
       ctx.fillStyle = '#ffffff'
@@ -64,7 +61,6 @@ export class Ball {
 
     ctx.restore()
 
-    // 外框
     ctx.beginPath()
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2)
     ctx.strokeStyle = '#777777'
@@ -72,7 +68,6 @@ export class Ball {
     ctx.stroke()
     ctx.closePath()
 
-    // 高光
     ctx.beginPath()
     ctx.arc(
       this.x - this.radius * 0.3,
