@@ -1,17 +1,360 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
 body {
   margin: 0;
-  font-family: Arial, "Microsoft JhengHei", sans-serif;
-  background: #1e1e1e;
+  padding: 0;
+  font-family: "Microsoft JhengHei", Arial, sans-serif;
+  background: #1b1b1b;
+  color: #fff;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 20px 0;
+}
+
+#app {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.phone-frame {
+  width: 430px;
+  max-width: 100%;
+  padding: 8px;
+}
+
+.game-screen {
+  width: 100%;
+  min-height: 900px;
+  border: 4px solid #2d2d2d;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(to bottom, #5e8b35 0%, #8db14c 10%, #e6c65d 30%, #ccb15a 100%);
+  position: relative;
+}
+
+.top-bar {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1.2fr;
+  gap: 10px;
+  padding: 10px 12px 6px;
+  align-items: center;
+}
+
+.stage-box,
+.resource-box {
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 10px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.resource-box {
+  gap: 8px;
+  font-size: 20px;
+}
+
+.stage-box {
+  justify-content: flex-start;
+  padding-left: 12px;
+  font-size: 22px;
+}
+
+.icon {
+  font-size: 20px;
+}
+
+.boss-area {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 10px;
+}
+
+.boss-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 24px;
+  font-weight: bold;
   color: white;
-}
-
-.container {
-  text-align: center;
-  margin-top: 100px;
-}
-
-button {
-  padding: 10px 20px;
-  font-size: 18px;
   cursor: pointer;
+  background: linear-gradient(to bottom, #ffb36a, #d84d22);
+  box-shadow: 0 3px 0 #7f2e16;
+}
+
+.battle-area {
+  margin: 0 14px;
+  height: 470px;
+  border: 4px solid #c4a15d;
+  border-radius: 12px;
+  background: linear-gradient(to bottom, #f1d270, #e2bc57);
+  position: relative;
+  overflow: hidden;
+}
+
+.battle-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.tab-bar {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: rgba(35, 55, 10, 0.9);
+  border-top: 2px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.3);
+}
+
+.tab-btn {
+  height: 56px;
+  border: none;
+  background: transparent;
+  color: #fff7c7;
+  font-size: 24px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  background: linear-gradient(to bottom, #45a4ff, #245ed6);
+  color: #ffffff;
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.25);
+}
+
+.panel-area {
+  background: linear-gradient(to bottom, #29430f, #1e320c);
+  padding: 18px 14px 24px;
+  min-height: 240px;
+}
+
+.weapon-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.weapon-card {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px;
+  text-align: center;
+  border: 2px solid rgba(255, 255, 255, 0.08);
+}
+
+.weapon-name {
+  min-height: 48px;
+  color: #fff;
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.weapon-image {
+  height: 110px;
+  border-radius: 10px;
+  background: linear-gradient(to bottom, #f8f5e8, #d8d2bf);
+  color: #555;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  margin-bottom: 12px;
+}
+
+.action-btn {
+  border: none;
+  border-radius: 10px;
+  min-width: 90px;
+  height: 40px;
+  font-size: 20px;
+  font-weight: bold;
+  color: white;
+  cursor: pointer;
+}
+
+.action-btn.upgrade {
+  background: linear-gradient(to bottom, #ff9f5d, #d94c1d);
+}
+
+.action-btn.locked {
+  background: linear-gradient(to bottom, #8b8b8b, #4f4f4f);
+}
+
+.hero-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: center;
+}
+
+.hero-info-card {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.08);
+}
+
+.hero-info-title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 14px;
+  color: #fff4b0;
+}
+
+.hero-info-row {
+  font-size: 22px;
+  color: white;
+  margin-bottom: 10px;
+}
+
+.buy-hero-btn {
+  border: none;
+  border-radius: 12px;
+  min-width: 220px;
+  height: 52px;
+  font-size: 22px;
+  font-weight: bold;
+  color: white;
+  cursor: pointer;
+  background: linear-gradient(to bottom, #59b8ff, #2967de);
+}
+
+.buy-hero-btn.disabled {
+  background: linear-gradient(to bottom, #888888, #555555);
+  cursor: not-allowed;
+}
+
+.weapon-modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 50;
+  padding: 20px;
+}
+
+.weapon-modal {
+  width: 100%;
+  max-width: 390px;
+  background: linear-gradient(to bottom, #ecd089, #d9b66d);
+  border: 3px solid #9c7335;
+  border-radius: 16px;
+  padding: 18px 16px 20px;
+  position: relative;
+  color: #5a3e12;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.weapon-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 8px;
+  background: #d95b2c;
+  color: white;
+  font-size: 20px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.weapon-modal-title {
+  text-align: center;
+  font-size: 30px;
+  font-weight: bold;
+  margin-bottom: 18px;
+  color: #fff8da;
+  text-shadow: 1px 1px 0 #7b5b1d;
+}
+
+.weapon-modal-top {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 14px;
+  margin-bottom: 16px;
+  align-items: start;
+}
+
+.weapon-modal-image {
+  width: 100px;
+  height: 100px;
+  border-radius: 12px;
+  border: 2px solid #c5a56b;
+  background: linear-gradient(to bottom, #f4efe2, #d8d1bf);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  font-weight: bold;
+}
+
+.weapon-modal-desc {
+  font-size: 18px;
+  line-height: 1.5;
+  color: #6b4b17;
+}
+
+.weapon-modal-block {
+  background: rgba(165, 115, 40, 0.18);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.weapon-modal-block-title {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #8d641f;
+}
+
+.weapon-modal-stat {
+  font-size: 19px;
+  line-height: 1.5;
+  color: #fff7e6;
+  text-shadow: 1px 1px 0 rgba(80, 50, 10, 0.55);
+}
+
+.weapon-modal-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.weapon-upgrade-btn {
+  border: none;
+  border-radius: 12px;
+  min-width: 180px;
+  height: 48px;
+  background: linear-gradient(to bottom, #46c736, #22831c);
+  color: white;
+  font-size: 22px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.weapon-upgrade-btn:disabled {
+  background: linear-gradient(to bottom, #888888, #555555);
+  cursor: not-allowed;
 }
