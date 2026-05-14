@@ -1,14 +1,21 @@
 import './style.css'
+import { canChallengeNextBoss } from './data/balance'
 import { GAME_CONFIG } from './data/gameConfig'
 import { WEAPON_LIST, getTotalWeaponDamage, getWeaponUpgradeCost } from './data/weapons'
-import { addOneBall, initGame } from './game/game'
+import { addOneBall, challengeNextBoss, initGame } from './game/game'
 import { loadSaveData, saveGameData } from './game/save'
+import coinIcon from './assets/images/resources/coin.png'
+import gemIcon from './assets/images/resources/gem.png'
 import { createBattleArea } from './ui/battleArea'
-import { createHeroPanel, createWeaponModal, createWeaponPanel } from './ui/panel'
+import { createHeroPanel, createShopPanel, createWeaponModal, createWeaponPanel } from './ui/panel'
 
 let currentTab = 'weapon'
 let saveData = loadSaveData()
 let selectedWeaponId = null
+let bossRemainingSeconds = null
+let toastTimer = null
+let shopTimer = null
+let lastShopTick = Date.now()
 
 function persistAndRefresh() {
   saveGameData(saveData)
@@ -20,6 +27,22 @@ function persistAndRefresh() {
   }
 }
 
+function showToast(message) {
+  const toast = document.querySelector('#toastMessage')
+  if (!toast) return
+
+  toast.textContent = message
+  toast.classList.add('show')
+
+  if (toastTimer) {
+    clearTimeout(toastTimer)
+  }
+
+  toastTimer = setTimeout(() => {
+    toast.classList.remove('show')
+  }, 1000)
+}
+
 function renderApp() {
   document.querySelector('#app').innerHTML = `
     <div class="phone-frame">
@@ -28,18 +51,19 @@ function renderApp() {
           <div class="stage-box">關卡 <span id="stageText">${saveData.stage}</span></div>
 
           <div class="resource-box coin-box">
-            <span class="icon">金</span>
+            <img class="resource-icon" src="${coinIcon}" alt="金幣" />
             <span id="coinCountText">${saveData.coins}</span>
           </div>
 
           <div class="resource-box gem-box">
-            <span class="icon">鑽</span>
+            <img class="resource-icon" src="${gemIcon}" alt="鑽石" />
             <span id="gemCountText">${saveData.gems}</span>
           </div>
         </header>
 
         <div class="boss-area">
-          <button class="boss-btn" type="button">BOSS</button>
+          <button class="boss-btn" id="bossChallengeBtn" type="button">BOSS</button>
+          <div class="boss-timer" id="bossTimerText"></div>
         </div>
 
         ${createBattleArea()}
@@ -47,11 +71,12 @@ function renderApp() {
         <nav class="tab-bar">
           <button class="tab-btn ${currentTab === 'hero' ? 'active' : ''}" id="heroTabBtn" type="button">英雄</button>
           <button class="tab-btn ${currentTab === 'weapon' ? 'active' : ''}" id="weaponTabBtn" type="button">武器</button>
-          <button class="tab-btn" type="button">技能</button>
+          <button class="tab-btn ${currentTab === 'shop' ? 'active' : ''}" id="shopTabBtn" type="button">商店</button>
           <button class="tab-btn" type="button">設定</button>
         </nav>
 
         <section class="panel-area" id="panelArea"></section>
+        <div class="toast-message" id="toastMessage"></div>
         <div id="modalRoot"></div>
       </div>
     </div>
@@ -59,18 +84,36 @@ function renderApp() {
 
   renderPanel()
   bindEvents()
+  updateTopBar()
+  startShopTimer()
   initGame({
     ballCount: saveData.ballCount,
     stage: saveData.stage,
     getCurrentDamage: () => getTotalWeaponDamage(saveData),
-    handleMonsterKilled: (coinReward) => {
+    handleEnemyKilled: (coinReward) => {
       saveData.coins += coinReward
       persistAndRefresh()
     },
-    handleStageClear: (nextStage) => {
+    handleStageChange: (nextStage) => {
       saveData.stage = nextStage
       persistAndRefresh()
     },
+    handleBossTimerChange: (remainingSeconds) => {
+      bossRemainingSeconds = remainingSeconds
+      updateTopBar()
+    },
+    handleBossFailed: (failedBossStage, previousStage) => {
+      saveData.failedBossStage = failedBossStage
+      saveData.stage = previousStage
+      persistAndRefresh()
+      showToast('挑戰失敗')
+    },
+    handleBossDefeated: (bossStage) => {
+      if (saveData.failedBossStage === bossStage) {
+        saveData.failedBossStage = null
+      }
+    },
+    canAutoEnterBoss: (bossStage) => saveData.failedBossStage !== bossStage,
   })
 }
 
@@ -78,19 +121,49 @@ function renderPanel() {
   const panelArea = document.querySelector('#panelArea')
   if (!panelArea) return
 
-  panelArea.innerHTML =
-    currentTab === 'hero'
-      ? createHeroPanel(saveData)
-      : createWeaponPanel(saveData)
+  if (currentTab === 'hero') {
+    panelArea.innerHTML = createHeroPanel(saveData)
+  } else if (currentTab === 'shop') {
+    panelArea.innerHTML = createShopPanel(saveData)
+  } else {
+    panelArea.innerHTML = createWeaponPanel(saveData)
+  }
 
   bindPanelEvents()
   updateTabActiveState()
+}
+
+function startShopTimer() {
+  if (shopTimer) {
+    clearInterval(shopTimer)
+  }
+
+  lastShopTick = Date.now()
+  shopTimer = setInterval(() => {
+    const now = Date.now()
+    const elapsedSeconds = Math.floor((now - lastShopTick) / 1000)
+
+    if (elapsedSeconds <= 0) return
+
+    lastShopTick += elapsedSeconds * 1000
+
+    if (saveData.shop.remainingSeconds <= 0) return
+
+    saveData.shop.remainingSeconds = Math.max(saveData.shop.remainingSeconds - elapsedSeconds, 0)
+    saveGameData(saveData)
+
+    if (currentTab === 'shop') {
+      renderPanel()
+    }
+  }, 250)
 }
 
 function updateTopBar() {
   const stageText = document.querySelector('#stageText')
   const coinCountText = document.querySelector('#coinCountText')
   const gemCountText = document.querySelector('#gemCountText')
+  const bossChallengeBtn = document.querySelector('#bossChallengeBtn')
+  const bossTimerText = document.querySelector('#bossTimerText')
 
   if (stageText) {
     stageText.textContent = saveData.stage
@@ -103,11 +176,23 @@ function updateTopBar() {
   if (gemCountText) {
     gemCountText.textContent = saveData.gems
   }
+
+  if (bossChallengeBtn) {
+    const canChallenge = canChallengeNextBoss(saveData.stage)
+    bossChallengeBtn.disabled = !canChallenge
+    bossChallengeBtn.textContent = canChallenge ? `挑戰 ${saveData.stage + 1} 關 BOSS` : 'BOSS'
+  }
+
+  if (bossTimerText) {
+    bossTimerText.textContent =
+      bossRemainingSeconds === null ? '' : `Boss 倒數：${bossRemainingSeconds}s`
+  }
 }
 
 function updateTabActiveState() {
   const heroTabBtn = document.querySelector('#heroTabBtn')
   const weaponTabBtn = document.querySelector('#weaponTabBtn')
+  const shopTabBtn = document.querySelector('#shopTabBtn')
 
   if (heroTabBtn) {
     heroTabBtn.classList.toggle('active', currentTab === 'hero')
@@ -115,6 +200,10 @@ function updateTabActiveState() {
 
   if (weaponTabBtn) {
     weaponTabBtn.classList.toggle('active', currentTab === 'weapon')
+  }
+
+  if (shopTabBtn) {
+    shopTabBtn.classList.toggle('active', currentTab === 'shop')
   }
 }
 
@@ -141,6 +230,8 @@ function closeWeaponModal() {
 function bindEvents() {
   const heroTabBtn = document.querySelector('#heroTabBtn')
   const weaponTabBtn = document.querySelector('#weaponTabBtn')
+  const shopTabBtn = document.querySelector('#shopTabBtn')
+  const bossChallengeBtn = document.querySelector('#bossChallengeBtn')
 
   if (heroTabBtn) {
     heroTabBtn.addEventListener('click', () => {
@@ -155,10 +246,24 @@ function bindEvents() {
       renderPanel()
     })
   }
+
+  if (shopTabBtn) {
+    shopTabBtn.addEventListener('click', () => {
+      currentTab = 'shop'
+      renderPanel()
+    })
+  }
+
+  if (bossChallengeBtn) {
+    bossChallengeBtn.addEventListener('click', () => {
+      challengeNextBoss()
+    })
+  }
 }
 
 function bindPanelEvents() {
   const buyHeroBtn = document.querySelector('#buyHeroBtn')
+  const claimShopGemBtn = document.querySelector('#claimShopGemBtn')
   const weaponButtons = document.querySelectorAll('.action-btn[data-weapon-id]')
 
   if (buyHeroBtn) {
@@ -180,6 +285,17 @@ function bindPanelEvents() {
       updateTopBar()
       addOneBall()
       renderPanel()
+    })
+  }
+
+  if (claimShopGemBtn) {
+    claimShopGemBtn.addEventListener('click', () => {
+      if (saveData.shop.remainingSeconds > 0) return
+
+      saveData.gems += saveData.shop.gemReward
+      saveData.shop.gemReward += GAME_CONFIG.shopGemRewardIncrease
+      saveData.shop.remainingSeconds = GAME_CONFIG.shopClaimCooldownSeconds
+      persistAndRefresh()
     })
   }
 
@@ -219,6 +335,10 @@ function bindWeaponModalEvents() {
         weaponState.unlocked = true
         weaponState.level = 1
         persistAndRefresh()
+        return
+      }
+
+      if (weaponState.level >= weapon.maxLevel) {
         return
       }
 

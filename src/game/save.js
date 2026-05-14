@@ -7,6 +7,11 @@ const defaultSaveData = {
   gems: GAME_CONFIG.defaultGems,
   ballCount: GAME_CONFIG.defaultBallCount,
   stage: GAME_CONFIG.defaultStage,
+  failedBossStage: null,
+  shop: {
+    remainingSeconds: 0,
+    gemReward: GAME_CONFIG.shopInitialGemReward,
+  },
   weapons: {
     1: {
       unlocked: true,
@@ -35,6 +40,25 @@ function mergeWeapons(savedWeapons = {}) {
   )
 }
 
+function getLegacyRemainingSeconds(savedShop = {}) {
+  if (typeof savedShop.remainingSeconds === 'number') {
+    return savedShop.remainingSeconds
+  }
+
+  if (typeof savedShop.nextClaimAt === 'number') {
+    return Math.max(Math.ceil((savedShop.nextClaimAt - Date.now()) / 1000), 0)
+  }
+
+  return defaultSaveData.shop.remainingSeconds
+}
+
+function mergeShop(savedShop = {}) {
+  return {
+    remainingSeconds: getLegacyRemainingSeconds(savedShop),
+    gemReward: savedShop.gemReward ?? defaultSaveData.shop.gemReward,
+  }
+}
+
 export function loadSaveData() {
   const rawData = localStorage.getItem(SAVE_KEY)
 
@@ -53,6 +77,8 @@ export function loadSaveData() {
       gems: parsedData.gems ?? defaultSaveData.gems,
       ballCount: parsedData.ballCount ?? defaultSaveData.ballCount,
       stage: parsedData.stage ?? defaultSaveData.stage,
+      failedBossStage: parsedData.failedBossStage ?? defaultSaveData.failedBossStage,
+      shop: mergeShop(parsedData.shop),
       weapons: mergeWeapons(parsedData.weapons),
     }
   } catch (error) {

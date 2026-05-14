@@ -9,3 +9,19 @@ export function getMonsterHp(stage) {
 export function getMonsterCoinReward(maxHp) {
   return Math.ceil(maxHp * GAME_CONFIG.monsterCoinRewardRate)
 }
+
+export function isBossStage(stage) {
+  return stage % GAME_CONFIG.bossStageInterval === 0
+}
+
+export function canChallengeNextBoss(stage) {
+  return isBossStage(stage + 1)
+}
+
+export function getBossHp(stage) {
+  return Math.round(getMonsterHp(stage) * GAME_CONFIG.bossHpMultiplier)
+}
+
+export function getBossCoinReward(maxHp) {
+  return Math.ceil(maxHp * GAME_CONFIG.bossCoinRewardRate)
+}
