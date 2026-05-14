@@ -1,45 +1,54 @@
 import './style.css'
-import { createBattleArea } from './ui/battleArea'
-import { initGame, addOneBall } from './game/game'
-import { loadSaveData, saveGameData } from './game/save'
-import { createWeaponPanel, createHeroPanel, createWeaponModal } from './ui/panel'
 import { GAME_CONFIG } from './data/gameConfig'
-import { WEAPON_LIST } from './data/weapons'
+import { WEAPON_LIST, getTotalWeaponDamage, getWeaponUpgradeCost } from './data/weapons'
+import { addOneBall, initGame } from './game/game'
+import { loadSaveData, saveGameData } from './game/save'
+import { createBattleArea } from './ui/battleArea'
+import { createHeroPanel, createWeaponModal, createWeaponPanel } from './ui/panel'
 
 let currentTab = 'weapon'
 let saveData = loadSaveData()
 let selectedWeaponId = null
 
+function persistAndRefresh() {
+  saveGameData(saveData)
+  updateTopBar()
+  renderPanel()
+
+  if (selectedWeaponId) {
+    openWeaponModal(selectedWeaponId)
+  }
+}
+
 function renderApp() {
   document.querySelector('#app').innerHTML = `
     <div class="phone-frame">
       <div class="game-screen">
-        
         <header class="top-bar">
-          <div class="stage-box">關卡 1</div>
+          <div class="stage-box">關卡 <span id="stageText">${saveData.stage}</span></div>
 
           <div class="resource-box coin-box">
-            <span class="icon">🪙</span>
+            <span class="icon">金</span>
             <span id="coinCountText">${saveData.coins}</span>
           </div>
 
           <div class="resource-box gem-box">
-            <span class="icon">💎</span>
+            <span class="icon">鑽</span>
             <span id="gemCountText">${saveData.gems}</span>
           </div>
         </header>
 
         <div class="boss-area">
-          <button class="boss-btn">挑戰BOSS</button>
+          <button class="boss-btn" type="button">BOSS</button>
         </div>
 
         ${createBattleArea()}
 
         <nav class="tab-bar">
-          <button class="tab-btn ${currentTab === 'hero' ? 'active' : ''}" id="heroTabBtn">英雄</button>
-          <button class="tab-btn ${currentTab === 'weapon' ? 'active' : ''}" id="weaponTabBtn">武器</button>
-          <button class="tab-btn">商店</button>
-          <button class="tab-btn">設置</button>
+          <button class="tab-btn ${currentTab === 'hero' ? 'active' : ''}" id="heroTabBtn" type="button">英雄</button>
+          <button class="tab-btn ${currentTab === 'weapon' ? 'active' : ''}" id="weaponTabBtn" type="button">武器</button>
+          <button class="tab-btn" type="button">技能</button>
+          <button class="tab-btn" type="button">設定</button>
         </nav>
 
         <section class="panel-area" id="panelArea"></section>
@@ -50,7 +59,19 @@ function renderApp() {
 
   renderPanel()
   bindEvents()
-  initGame(saveData.ballCount)
+  initGame({
+    ballCount: saveData.ballCount,
+    stage: saveData.stage,
+    getCurrentDamage: () => getTotalWeaponDamage(saveData),
+    handleMonsterKilled: (coinReward) => {
+      saveData.coins += coinReward
+      persistAndRefresh()
+    },
+    handleStageClear: (nextStage) => {
+      saveData.stage = nextStage
+      persistAndRefresh()
+    },
+  })
 }
 
 function renderPanel() {
@@ -67,8 +88,13 @@ function renderPanel() {
 }
 
 function updateTopBar() {
+  const stageText = document.querySelector('#stageText')
   const coinCountText = document.querySelector('#coinCountText')
   const gemCountText = document.querySelector('#gemCountText')
+
+  if (stageText) {
+    stageText.textContent = saveData.stage
+  }
 
   if (coinCountText) {
     coinCountText.textContent = saveData.coins
@@ -97,11 +123,10 @@ function openWeaponModal(weaponId) {
 
   const weapon = WEAPON_LIST.find((item) => item.id === weaponId)
   const weaponState = saveData.weapons[weaponId]
-
   const modalRoot = document.querySelector('#modalRoot')
   if (!modalRoot || !weapon) return
 
-  modalRoot.innerHTML = createWeaponModal(weapon, weaponState)
+  modalRoot.innerHTML = createWeaponModal(weapon, weaponState, saveData)
   bindWeaponModalEvents()
 }
 
@@ -139,7 +164,7 @@ function bindPanelEvents() {
   if (buyHeroBtn) {
     buyHeroBtn.addEventListener('click', () => {
       if (saveData.ballCount >= GAME_CONFIG.maxBallCount) {
-        alert('英雄已達上限')
+        alert('英雄數量已達上限')
         return
       }
 
@@ -160,8 +185,7 @@ function bindPanelEvents() {
 
   weaponButtons.forEach((button) => {
     button.addEventListener('click', () => {
-      const weaponId = Number(button.dataset.weaponId)
-      openWeaponModal(weaponId)
+      openWeaponModal(Number(button.dataset.weaponId))
     })
   })
 }
@@ -179,16 +203,34 @@ function bindWeaponModalEvents() {
   if (confirmWeaponUpgradeBtn) {
     confirmWeaponUpgradeBtn.addEventListener('click', () => {
       const weaponId = Number(confirmWeaponUpgradeBtn.dataset.weaponId)
+      const action = confirmWeaponUpgradeBtn.dataset.action
+      const weapon = WEAPON_LIST.find((item) => item.id === weaponId)
       const weaponState = saveData.weapons[weaponId]
 
-      if (!weaponState) return
-      if (!weaponState.unlocked) return
+      if (!weapon || !weaponState) return
 
+      if (action === 'unlock') {
+        if (saveData.gems < weapon.unlockCost) {
+          alert('鑽石不足')
+          return
+        }
+
+        saveData.gems -= weapon.unlockCost
+        weaponState.unlocked = true
+        weaponState.level = 1
+        persistAndRefresh()
+        return
+      }
+
+      const upgradeCost = getWeaponUpgradeCost(weapon, weaponState.level)
+      if (saveData.coins < upgradeCost) {
+        alert('金幣不足')
+        return
+      }
+
+      saveData.coins -= upgradeCost
       weaponState.level += 1
-
-      saveGameData(saveData)
-      renderPanel()
-      openWeaponModal(weaponId)
+      persistAndRefresh()
     })
   }
 }

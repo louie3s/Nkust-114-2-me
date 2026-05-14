@@ -1,13 +1,23 @@
 import { GAME_CONFIG } from '../data/gameConfig'
-import { WEAPON_LIST } from '../data/weapons'
+import { WEAPON_LIST, getTotalWeaponDamage, getWeaponUpgradeCost } from '../data/weapons'
+import axeImage from '../assets/images/weapons/axe.png'
+
+const weaponImageMap = {
+  1: axeImage,
+}
 
 export function createWeaponPanel(saveData) {
   return `
+    <div class="weapon-summary">
+      <div>目前傷害：${getTotalWeaponDamage(saveData)}</div>
+      <div>升級花費每次 +20%</div>
+    </div>
     <div class="weapon-grid">
       ${WEAPON_LIST.map((weapon) => {
         const weaponState = saveData.weapons[weapon.id]
         const isUnlocked = weaponState?.unlocked ?? false
         const level = weaponState?.level ?? 0
+        const upgradeCost = getWeaponUpgradeCost(weapon, level)
 
         return `
           <div class="weapon-card">
@@ -15,7 +25,17 @@ export function createWeaponPanel(saveData) {
               ${isUnlocked ? `${weapon.name}+${level}` : weapon.name}
             </div>
 
-            <div class="weapon-image">武器圖</div>
+            <div class="weapon-image">
+              ${
+                weaponImageMap[weapon.id]
+                  ? `<img src="${weaponImageMap[weapon.id]}" alt="${weapon.name}" class="weapon-img" />`
+                  : '<span class="weapon-placeholder">武器</span>'
+              }
+            </div>
+
+            <div class="weapon-cost">
+              ${isUnlocked ? `升級 ${upgradeCost} 金幣` : `解鎖 ${weapon.unlockCost} 鑽石`}
+            </div>
 
             <button
               class="action-btn ${isUnlocked ? 'upgrade' : 'locked'}"
@@ -34,16 +54,16 @@ export function createHeroPanel(saveData) {
   const isMax = saveData.ballCount >= GAME_CONFIG.maxBallCount
   const buttonText = isMax
     ? '已達上限'
-    : `購買英雄（${GAME_CONFIG.heroBuyCost} 鑽石）`
+    : `購買英雄：${GAME_CONFIG.heroBuyCost} 鑽石`
 
   return `
     <div class="hero-panel">
       <div class="hero-info-card">
         <div class="hero-info-title">英雄資訊</div>
-        <div class="hero-info-row">英雄：${saveData.ballCount}</div>
         <div class="hero-info-row">球數：${saveData.ballCount}</div>
+        <div class="hero-info-row">目前關卡：${saveData.stage}</div>
         <div class="hero-info-row">鑽石：${saveData.gems}</div>
-        <div class="hero-info-row">上限：${GAME_CONFIG.maxBallCount}</div>
+        <div class="hero-info-row">球數上限：${GAME_CONFIG.maxBallCount}</div>
       </div>
 
       <button
@@ -57,36 +77,48 @@ export function createHeroPanel(saveData) {
   `
 }
 
-export function createWeaponModal(weapon, weaponState) {
+export function createWeaponModal(weapon, weaponState, saveData) {
   const level = weaponState?.level ?? 0
   const isUnlocked = weaponState?.unlocked ?? false
   const weaponTitle = isUnlocked ? `${weapon.name}+${level}` : weapon.name
+  const upgradeCost = getWeaponUpgradeCost(weapon, level)
+  const canUpgrade = isUnlocked && saveData.coins >= upgradeCost
+  const canUnlock = !isUnlocked && saveData.gems >= weapon.unlockCost
 
   return `
     <div class="weapon-modal-overlay" id="weaponModalOverlay">
       <div class="weapon-modal">
-        <button class="weapon-modal-close" id="closeWeaponModalBtn">✕</button>
+        <button class="weapon-modal-close" id="closeWeaponModalBtn">X</button>
 
         <div class="weapon-modal-title">${weaponTitle}</div>
 
         <div class="weapon-modal-top">
-          <div class="weapon-modal-image">武器圖</div>
+          <div class="weapon-modal-image">
+            ${
+              weaponImageMap[weapon.id]
+                ? `<img src="${weaponImageMap[weapon.id]}" alt="${weapon.name}" class="weapon-modal-img" />`
+                : '<span class="weapon-placeholder">武器</span>'
+            }
+          </div>
           <div class="weapon-modal-desc">
             ${weapon.baseDescription}
           </div>
         </div>
 
         <div class="weapon-modal-block">
-          <div class="weapon-modal-block-title">基礎屬性</div>
-          <div class="weapon-modal-stat">目前等級：+${level}</div>
+          <div class="weapon-modal-block-title">基本能力</div>
+          <div class="weapon-modal-stat">等級：${level}</div>
+          <div class="weapon-modal-stat">每級傷害：+${weapon.damagePerLevel}</div>
           ${weapon.basicStats.map((stat) => `
             <div class="weapon-modal-stat">${stat}</div>
           `).join('')}
         </div>
 
         <div class="weapon-modal-block">
-          <div class="weapon-modal-block-title">附加說明</div>
-          <div class="weapon-modal-stat">每升 1 級，武器等級 +1</div>
+          <div class="weapon-modal-block-title">花費</div>
+          <div class="weapon-modal-stat">
+            ${isUnlocked ? `下一級需要 ${upgradeCost} 金幣` : `解鎖需要 ${weapon.unlockCost} 鑽石`}
+          </div>
         </div>
 
         <div class="weapon-modal-actions">
@@ -94,9 +126,10 @@ export function createWeaponModal(weapon, weaponState) {
             class="weapon-upgrade-btn"
             id="confirmWeaponUpgradeBtn"
             data-weapon-id="${weapon.id}"
-            ${isUnlocked ? '' : 'disabled'}
+            data-action="${isUnlocked ? 'upgrade' : 'unlock'}"
+            ${(isUnlocked ? canUpgrade : canUnlock) ? '' : 'disabled'}
           >
-            ${isUnlocked ? '升級武器' : '尚未解鎖'}
+            ${isUnlocked ? '升級武器' : '解鎖武器'}
           </button>
         </div>
       </div>

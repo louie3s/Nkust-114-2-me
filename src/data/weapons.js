@@ -1,32 +1,52 @@
 export const WEAPON_LIST = [
   {
     id: 1,
-    name: '開天斧',
-    baseDescription: '盤古開天闢地所使用的武器，相傳原盤古外無人可拿起。妳能使用只是因為這是後人仿制的裝飾品。',
+    name: '訓練斧',
+    baseDescription: '穩定好上手的初始武器，適合用來清理前期小怪。',
     basicStats: [
-      '英雄總攻擊 + 2',
-      '6% 機率觸發 300% 總傷害的旋風斬',
+      '每級傷害 +2',
+      '升級消耗金幣，每級需求增加 20%',
     ],
     unlockCost: 0,
+    upgradeBaseCost: 30,
+    damagePerLevel: 2,
   },
   {
     id: 2,
-    name: '國王權杖',
-    baseDescription: '象徵王權的權杖，能引導強大的魔力。',
+    name: '鋼鐵長槍',
+    baseDescription: '傷害比訓練斧更高，解鎖後能更快推進關卡。',
     basicStats: [
-      '英雄總攻擊 + 3',
-      '5% 機率觸發魔法衝擊',
+      '每級傷害 +3',
+      '使用鑽石解鎖，之後用金幣升級',
     ],
     unlockCost: 100,
+    upgradeBaseCost: 80,
+    damagePerLevel: 3,
   },
   {
     id: 3,
-    name: '幹將劍',
-    baseDescription: '傳說中的名劍，劍鋒凌厲。',
+    name: '烈焰戰錘',
+    baseDescription: '重型武器，單級提供最多傷害，適合挑戰高血量小怪。',
     basicStats: [
-      '英雄總攻擊 + 5',
-      '8% 機率觸發劍氣斬',
+      '每級傷害 +5',
+      '高升級成本，高傷害回報',
     ],
     unlockCost: 150,
+    upgradeBaseCost: 150,
+    damagePerLevel: 5,
   },
 ]
+
+export function getWeaponUpgradeCost(weapon, level) {
+  const currentLevel = Math.max(level, 1)
+  return Math.ceil(weapon.upgradeBaseCost * (1.2 ** (currentLevel - 1)))
+}
+
+export function getTotalWeaponDamage(saveData) {
+  return WEAPON_LIST.reduce((total, weapon) => {
+    const weaponState = saveData.weapons[weapon.id]
+    if (!weaponState?.unlocked) return total
+
+    return total + weapon.damagePerLevel * weaponState.level
+  }, 5)
+}

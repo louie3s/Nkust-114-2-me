@@ -6,6 +6,7 @@ const defaultSaveData = {
   coins: GAME_CONFIG.defaultCoins,
   gems: GAME_CONFIG.defaultGems,
   ballCount: GAME_CONFIG.defaultBallCount,
+  stage: GAME_CONFIG.defaultStage,
   weapons: {
     1: {
       unlocked: true,
@@ -22,6 +23,18 @@ const defaultSaveData = {
   },
 }
 
+function mergeWeapons(savedWeapons = {}) {
+  return Object.fromEntries(
+    Object.entries(defaultSaveData.weapons).map(([weaponId, defaultWeapon]) => [
+      weaponId,
+      {
+        ...defaultWeapon,
+        ...(savedWeapons[weaponId] ?? {}),
+      },
+    ])
+  )
+}
+
 export function loadSaveData() {
   const rawData = localStorage.getItem(SAVE_KEY)
 
@@ -31,15 +44,19 @@ export function loadSaveData() {
 
   try {
     const parsedData = JSON.parse(rawData)
+    const isLegacySave = parsedData.stage === undefined
 
     return {
-      coins: parsedData.coins ?? defaultSaveData.coins,
+      coins: isLegacySave
+        ? Math.max(parsedData.coins ?? defaultSaveData.coins, defaultSaveData.coins)
+        : parsedData.coins ?? defaultSaveData.coins,
       gems: parsedData.gems ?? defaultSaveData.gems,
       ballCount: parsedData.ballCount ?? defaultSaveData.ballCount,
-      weapons: parsedData.weapons ?? structuredClone(defaultSaveData.weapons),
+      stage: parsedData.stage ?? defaultSaveData.stage,
+      weapons: mergeWeapons(parsedData.weapons),
     }
   } catch (error) {
-    console.error('讀取存檔失敗，改用預設資料：', error)
+    console.error('讀取存檔失敗，改用預設資料。', error)
     return structuredClone(defaultSaveData)
   }
 }
