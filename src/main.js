@@ -2,12 +2,18 @@ import './style.css'
 import { canChallengeNextBoss } from './data/balance'
 import { GAME_CONFIG } from './data/gameConfig'
 import { WEAPON_LIST, getTotalWeaponDamage, getWeaponUpgradeCost } from './data/weapons'
-import { addOneBall, challengeNextBoss, initGame } from './game/game'
+import { addOneBall, challengeNextBoss, getBattleState, initGame } from './game/game'
 import { loadSaveData, saveGameData } from './game/save'
 import coinIcon from './assets/images/resources/coin.png'
 import gemIcon from './assets/images/resources/gem.png'
 import { createBattleArea } from './ui/battleArea'
-import { createHeroPanel, createShopPanel, createWeaponModal, createWeaponPanel } from './ui/panel'
+import {
+  createHeroPanel,
+  createShopPanel,
+  createWeaponModal,
+  createWeaponPanel,
+  getHeroBuyCost,
+} from './ui/panel'
 
 let currentTab = 'weapon'
 let saveData = loadSaveData()
@@ -17,8 +23,13 @@ let toastTimer = null
 let shopTimer = null
 let lastShopTick = Date.now()
 
-function persistAndRefresh() {
+function saveOnly() {
   saveGameData(saveData)
+}
+
+function persistAndRefresh() {
+  saveData.battle = getBattleState() ?? saveData.battle
+  saveOnly()
   updateTopBar()
   renderPanel()
 
@@ -89,14 +100,19 @@ function renderApp() {
   initGame({
     ballCount: saveData.ballCount,
     stage: saveData.stage,
+    battleState: saveData.battle,
     getCurrentDamage: () => getTotalWeaponDamage(saveData),
     handleEnemyKilled: (coinReward) => {
       saveData.coins += coinReward
-      persistAndRefresh()
+      saveOnly()
+      updateTopBar()
+      renderPanel()
     },
     handleStageChange: (nextStage) => {
       saveData.stage = nextStage
-      persistAndRefresh()
+      saveOnly()
+      updateTopBar()
+      renderPanel()
     },
     handleBossTimerChange: (remainingSeconds) => {
       bossRemainingSeconds = remainingSeconds
@@ -105,13 +121,26 @@ function renderApp() {
     handleBossFailed: (failedBossStage, previousStage) => {
       saveData.failedBossStage = failedBossStage
       saveData.stage = previousStage
-      persistAndRefresh()
+      saveOnly()
+      updateTopBar()
+      renderPanel()
       showToast('挑戰失敗')
     },
     handleBossDefeated: (bossStage) => {
       if (saveData.failedBossStage === bossStage) {
         saveData.failedBossStage = null
+        saveOnly()
       }
+    },
+    handleBattleStateChange: (battleState) => {
+      saveData.battle = battleState
+
+      if (battleState?.stage) {
+        saveData.stage = battleState.stage
+      }
+
+      saveOnly()
+      updateTopBar()
     },
     canAutoEnterBoss: (bossStage) => saveData.failedBossStage !== bossStage,
   })
@@ -150,7 +179,7 @@ function startShopTimer() {
     if (saveData.shop.remainingSeconds <= 0) return
 
     saveData.shop.remainingSeconds = Math.max(saveData.shop.remainingSeconds - elapsedSeconds, 0)
-    saveGameData(saveData)
+    saveOnly()
 
     if (currentTab === 'shop') {
       renderPanel()
@@ -185,7 +214,7 @@ function updateTopBar() {
 
   if (bossTimerText) {
     bossTimerText.textContent =
-      bossRemainingSeconds === null ? '' : `Boss 倒數：${bossRemainingSeconds}s`
+      bossRemainingSeconds === null ? '' : `Boss 倒數 ${bossRemainingSeconds}s`
   }
 }
 
@@ -268,20 +297,22 @@ function bindPanelEvents() {
 
   if (buyHeroBtn) {
     buyHeroBtn.addEventListener('click', () => {
+      const heroBuyCost = getHeroBuyCost(saveData.ballCount)
+
       if (saveData.ballCount >= GAME_CONFIG.maxBallCount) {
-        alert('英雄數量已達上限')
+        alert('英雄已達上限')
         return
       }
 
-      if (saveData.gems < GAME_CONFIG.heroBuyCost) {
+      if (saveData.gems < heroBuyCost) {
         alert('鑽石不足')
         return
       }
 
-      saveData.gems -= GAME_CONFIG.heroBuyCost
+      saveData.gems -= heroBuyCost
       saveData.ballCount += 1
 
-      saveGameData(saveData)
+      saveOnly()
       updateTopBar()
       addOneBall()
       renderPanel()
@@ -354,5 +385,10 @@ function bindWeaponModalEvents() {
     })
   }
 }
+
+window.addEventListener('beforeunload', () => {
+  saveData.battle = getBattleState() ?? saveData.battle
+  saveOnly()
+})
 
 renderApp()

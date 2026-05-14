@@ -8,6 +8,7 @@ const defaultSaveData = {
   ballCount: GAME_CONFIG.defaultBallCount,
   stage: GAME_CONFIG.defaultStage,
   failedBossStage: null,
+  battle: null,
   shop: {
     remainingSeconds: 0,
     gemReward: GAME_CONFIG.shopInitialGemReward,
@@ -78,11 +79,12 @@ export function loadSaveData() {
       ballCount: parsedData.ballCount ?? defaultSaveData.ballCount,
       stage: parsedData.stage ?? defaultSaveData.stage,
       failedBossStage: parsedData.failedBossStage ?? defaultSaveData.failedBossStage,
+      battle: parsedData.battle ?? defaultSaveData.battle,
       shop: mergeShop(parsedData.shop),
       weapons: mergeWeapons(parsedData.weapons),
     }
   } catch (error) {
-    console.error('讀取存檔失敗，改用預設資料。', error)
+    console.error('讀取存檔失敗，已重置存檔', error)
     return structuredClone(defaultSaveData)
   }
 }

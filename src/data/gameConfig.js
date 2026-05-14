@@ -1,6 +1,7 @@
 export const GAME_CONFIG = {
   maxBallCount: 6,
   heroBuyCost: 50,
+  heroBuyCostMultiplier: 2,
   defaultCoins: 100,
   defaultGems: 100,
   defaultBallCount: 1,

@@ -7,8 +7,16 @@ import {
   isBossStage,
 } from '../data/balance'
 import { GAME_CONFIG } from '../data/gameConfig'
-import bossImageSrc from '../assets/images/bosses/purple-dragon-boss.png'
-import monsterImageSrc from '../assets/images/monsters/purple-dragon.png'
+import fireBossImageSrc from '../assets/images/bosses/fire-boss.png'
+import iceBossImageSrc from '../assets/images/bosses/ice-boss.png'
+import lightningBossImageSrc from '../assets/images/bosses/lightning-boss.png'
+import natureFireBossImageSrc from '../assets/images/bosses/nature-fire-boss.png'
+import purpleBossImageSrc from '../assets/images/bosses/purple-dragon-boss.png'
+import fireDragonImageSrc from '../assets/images/monsters/fire-dragon.png'
+import forestDragonImageSrc from '../assets/images/monsters/forest-dragon.png'
+import iceDragonImageSrc from '../assets/images/monsters/ice-dragon.png'
+import lightningDragonImageSrc from '../assets/images/monsters/lightning-dragon.png'
+import purpleDragonImageSrc from '../assets/images/monsters/purple-dragon.png'
 import { Ball } from './ball'
 
 const BALL_CONFIG = {
@@ -28,11 +36,31 @@ const ENEMY_CONFIG = {
   maxCatchUpSeconds: 120,
 }
 
-const monsterImage = new Image()
-monsterImage.src = monsterImageSrc
+function createImage(src) {
+  const image = new Image()
+  image.src = src
+  return image
+}
 
-const bossImage = new Image()
-bossImage.src = bossImageSrc
+const monsterImageEntries = [
+  { key: 'purple-dragon', image: createImage(purpleDragonImageSrc) },
+  { key: 'lightning-dragon', image: createImage(lightningDragonImageSrc) },
+  { key: 'fire-dragon', image: createImage(fireDragonImageSrc) },
+  { key: 'ice-dragon', image: createImage(iceDragonImageSrc) },
+  { key: 'forest-dragon', image: createImage(forestDragonImageSrc) },
+]
+
+const bossImageEntries = [
+  { key: 'purple-dragon-boss', image: createImage(purpleBossImageSrc) },
+  { key: 'fire-boss', image: createImage(fireBossImageSrc) },
+  { key: 'nature-fire-boss', image: createImage(natureFireBossImageSrc) },
+  { key: 'lightning-boss', image: createImage(lightningBossImageSrc) },
+  { key: 'ice-boss', image: createImage(iceBossImageSrc) },
+]
+
+const imageMap = new Map(
+  [...monsterImageEntries, ...bossImageEntries].map((entry) => [entry.key, entry.image])
+)
 
 let canvas = null
 let ctx = null
@@ -44,12 +72,14 @@ let lastSimulationTime = 0
 let accumulatedSeconds = 0
 let currentStage = GAME_CONFIG.defaultStage
 let bossDeadline = null
+let lastBossRemainingSeconds = null
 let getDamage = () => 5
 let onEnemyKilled = () => {}
 let onStageChange = () => {}
 let onBossTimerChange = () => {}
 let onBossFailed = () => {}
 let onBossDefeated = () => {}
+let onBattleStateChange = () => {}
 let shouldAutoEnterBoss = () => true
 
 function createBall(canvasWidth, canvasHeight) {
@@ -82,31 +112,140 @@ function shuffle(items) {
   return [...items].sort(() => Math.random() - 0.5)
 }
 
-function createNormalStage(stage) {
+function getRandomEntry(entries) {
+  return entries[Math.floor(Math.random() * entries.length)]
+}
+
+function getImageByKey(imageKey, enemyType) {
+  const fallbackEntries = enemyType === 'boss' ? bossImageEntries : monsterImageEntries
+  return imageMap.get(imageKey) ?? fallbackEntries[0].image
+}
+
+function getResetHp(enemyType, stage) {
+  return enemyType === 'boss' ? getBossHp(stage) : getMonsterHp(stage)
+}
+
+function toSavedEnemy(enemy) {
+  return {
+    id: enemy.id,
+    type: enemy.type,
+    x: enemy.x,
+    y: enemy.y,
+    size: enemy.size,
+    imageKey: enemy.imageKey,
+  }
+}
+
+function hydrateEnemy(savedEnemy, stage, index) {
+  const type = savedEnemy.type === 'boss' ? 'boss' : 'monster'
+  const maxHp = getResetHp(type, stage)
+  const fallbackEntry = type === 'boss' ? bossImageEntries[0] : monsterImageEntries[0]
+  const imageKey = savedEnemy.imageKey ?? fallbackEntry.key
+
+  return {
+    id: savedEnemy.id ?? `${type}-${stage}-${index}-${Date.now()}`,
+    type,
+    x: Number.isFinite(savedEnemy.x) ? savedEnemy.x : canvas.width * 0.5,
+    y: Number.isFinite(savedEnemy.y) ? savedEnemy.y : canvas.height * 0.4,
+    size: savedEnemy.size ?? (type === 'boss' ? ENEMY_CONFIG.bossSize : ENEMY_CONFIG.monsterSize),
+    hp: maxHp,
+    maxHp,
+    imageKey,
+    image: getImageByKey(imageKey, type),
+    isDead: false,
+    hitFlashUntil: 0,
+  }
+}
+
+function serializeBattleState(currentTime = performance.now()) {
+  const aliveEnemies = enemies.filter((enemy) => !enemy.isDead)
+
+  if (!canvas || aliveEnemies.length === 0) {
+    return null
+  }
+
+  return {
+    stage: currentStage,
+    bossRemainingMs: bossDeadline
+      ? Math.max(Math.ceil(bossDeadline - currentTime), 0)
+      : null,
+    enemies: aliveEnemies.map(toSavedEnemy),
+  }
+}
+
+function notifyBattleStateChange(currentTime = performance.now()) {
+  onBattleStateChange(serializeBattleState(currentTime))
+}
+
+function restoreBattleState(battleState, currentTime = performance.now()) {
+  if (!battleState || !Array.isArray(battleState.enemies) || battleState.enemies.length === 0) {
+    return false
+  }
+
+  const stage = Number(battleState.stage)
+  if (!Number.isFinite(stage) || stage < 1) {
+    return false
+  }
+
+  currentStage = stage
+  enemies = battleState.enemies.map((enemy, index) => hydrateEnemy(enemy, stage, index))
+
+  if (isBossStage(stage)) {
+    const remainingMs =
+      typeof battleState.bossRemainingMs === 'number'
+        ? Math.max(battleState.bossRemainingMs, 0)
+        : GAME_CONFIG.bossTimeLimitSeconds * 1000
+
+    bossDeadline = currentTime + remainingMs
+    lastBossRemainingSeconds = Math.ceil(remainingMs / 1000)
+    onBossTimerChange(lastBossRemainingSeconds)
+  } else {
+    bossDeadline = null
+    lastBossRemainingSeconds = null
+    onBossTimerChange(null)
+  }
+
+  notifyBattleStateChange(currentTime)
+  return true
+}
+
+function createNormalStage(stage, shouldNotify = true) {
   const enemyCount =
     Math.floor(Math.random() * (GAME_CONFIG.monsterMaxCount - GAME_CONFIG.monsterMinCount + 1)) +
     GAME_CONFIG.monsterMinCount
   const maxHp = getMonsterHp(stage)
   bossDeadline = null
+  lastBossRemainingSeconds = null
   onBossTimerChange(null)
 
   enemies = shuffle(getMonsterPositions(canvas.width, canvas.height))
     .slice(0, enemyCount)
-    .map((position, index) => ({
-      id: `monster-${stage}-${index}-${Date.now()}`,
-      type: 'monster',
-      ...position,
-      size: ENEMY_CONFIG.monsterSize,
-      hp: maxHp,
-      maxHp,
-      isDead: false,
-      hitFlashUntil: 0,
-    }))
+    .map((position, index) => {
+      const imageEntry = getRandomEntry(monsterImageEntries)
+
+      return {
+        id: `monster-${stage}-${index}-${Date.now()}`,
+        type: 'monster',
+        ...position,
+        size: ENEMY_CONFIG.monsterSize,
+        hp: maxHp,
+        maxHp,
+        imageKey: imageEntry.key,
+        image: imageEntry.image,
+        isDead: false,
+        hitFlashUntil: 0,
+      }
+    })
+
+  if (shouldNotify) notifyBattleStateChange()
 }
 
-function createBossStage(stage, currentTime = performance.now()) {
+function createBossStage(stage, currentTime = performance.now(), shouldNotify = true) {
   const maxHp = getBossHp(stage)
+  const imageEntry = getRandomEntry(bossImageEntries)
+
   bossDeadline = currentTime + GAME_CONFIG.bossTimeLimitSeconds * 1000
+  lastBossRemainingSeconds = GAME_CONFIG.bossTimeLimitSeconds
   onBossTimerChange(GAME_CONFIG.bossTimeLimitSeconds)
 
   enemies = [
@@ -118,19 +257,23 @@ function createBossStage(stage, currentTime = performance.now()) {
       size: ENEMY_CONFIG.bossSize,
       hp: maxHp,
       maxHp,
+      imageKey: imageEntry.key,
+      image: imageEntry.image,
       isDead: false,
       hitFlashUntil: 0,
     },
   ]
+
+  if (shouldNotify) notifyBattleStateChange(currentTime)
 }
 
-function createStage(stage, currentTime = performance.now()) {
+function createStage(stage, currentTime = performance.now(), shouldNotify = true) {
   currentStage = stage
 
   if (isBossStage(stage)) {
-    createBossStage(stage, currentTime)
+    createBossStage(stage, currentTime, shouldNotify)
   } else {
-    createNormalStage(stage)
+    createNormalStage(stage, shouldNotify)
   }
 }
 
@@ -146,7 +289,7 @@ function drawEnemy(enemy, currentTime) {
   const drawY = enemy.y - size / 2
   const hpPercent = Math.max(enemy.hp / enemy.maxHp, 0)
   const isHit = currentTime < enemy.hitFlashUntil
-  const image = enemy.type === 'boss' ? bossImage : monsterImage
+  const image = enemy.image
 
   ctx.save()
   ctx.globalAlpha = isHit ? 0.72 : 1
@@ -222,7 +365,12 @@ function handleBossTimer(currentTime) {
   if (!bossDeadline || !isBossStage(currentStage)) return
 
   const remainingSeconds = Math.max(Math.ceil((bossDeadline - currentTime) / 1000), 0)
-  onBossTimerChange(remainingSeconds)
+
+  if (remainingSeconds !== lastBossRemainingSeconds) {
+    lastBossRemainingSeconds = remainingSeconds
+    onBossTimerChange(remainingSeconds)
+    notifyBattleStateChange(currentTime)
+  }
 
   if (remainingSeconds > 0) return
 
@@ -240,6 +388,7 @@ function handleEnemyDefeated(enemy, currentTime) {
     onBossDefeated(currentStage)
     onEnemyKilled(getBossCoinReward(enemy.maxHp))
     bossDeadline = null
+    lastBossRemainingSeconds = null
     onBossTimerChange(null)
     const nextStage = currentStage + 1
     onStageChange(nextStage)
@@ -251,6 +400,8 @@ function handleEnemyDefeated(enemy, currentTime) {
 }
 
 function handleCollisions(currentTime) {
+  let removedEnemy = false
+
   for (const ball of balls) {
     if (!ball.enemyHitTimes) {
       ball.enemyHitTimes = {}
@@ -282,6 +433,7 @@ function handleCollisions(currentTime) {
       ball.enemyHitTimes[enemy.id] = currentTime
 
       if (enemy.hp <= 0) {
+        removedEnemy = true
         handleEnemyDefeated(enemy, currentTime)
       }
     }
@@ -300,6 +452,11 @@ function handleCollisions(currentTime) {
 
     onStageChange(nextStage)
     createStage(nextStage)
+    return
+  }
+
+  if (removedEnemy) {
+    notifyBattleStateChange(currentTime)
   }
 }
 
@@ -360,12 +517,14 @@ export function initGame(options = {}) {
   const {
     ballCount = 1,
     stage = GAME_CONFIG.defaultStage,
+    battleState = null,
     getCurrentDamage = () => 5,
     handleEnemyKilled = () => {},
     handleStageChange = () => {},
     handleBossTimerChange = () => {},
     handleBossFailed = () => {},
     handleBossDefeated = () => {},
+    handleBattleStateChange = () => {},
     canAutoEnterBoss = () => true,
   } = options
 
@@ -375,6 +534,7 @@ export function initGame(options = {}) {
   onBossTimerChange = handleBossTimerChange
   onBossFailed = handleBossFailed
   onBossDefeated = handleBossDefeated
+  onBattleStateChange = handleBattleStateChange
   shouldAutoEnterBoss = canAutoEnterBoss
 
   ctx = canvas.getContext('2d')
@@ -392,7 +552,10 @@ export function initGame(options = {}) {
     balls.push(createBall(width, height))
   }
 
-  createStage(stage)
+  const now = performance.now()
+  if (!restoreBattleState(battleState, now)) {
+    createStage(stage, now)
+  }
 
   if (animationId) {
     cancelAnimationFrame(animationId)
@@ -410,6 +573,10 @@ export function initGame(options = {}) {
     }
   }, ENEMY_CONFIG.simulationTickMs)
   animationId = requestAnimationFrame(renderLoop)
+}
+
+export function getBattleState() {
+  return serializeBattleState()
 }
 
 export function addOneBall() {
