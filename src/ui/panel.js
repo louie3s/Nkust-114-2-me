@@ -112,6 +112,16 @@ export function createShopPanel(saveData) {
   `
 }
 
+export function createSettingsPanel() {
+  return `
+    <div class="settings-panel">
+      <button id="resetGameBtn" class="reset-game-btn" type="button">
+        重置遊戲
+      </button>
+    </div>
+  `
+}
+
 export function createWeaponModal(weapon, weaponState, saveData) {
   const level = weaponState?.level ?? 0
   const isUnlocked = weaponState?.unlocked ?? false

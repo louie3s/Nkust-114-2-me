@@ -3,12 +3,13 @@ import { canChallengeNextBoss } from './data/balance'
 import { GAME_CONFIG } from './data/gameConfig'
 import { WEAPON_LIST, getTotalWeaponDamage, getWeaponUpgradeCost } from './data/weapons'
 import { addOneBall, challengeNextBoss, getBattleState, initGame } from './game/game'
-import { loadSaveData, saveGameData } from './game/save'
+import { loadSaveData, resetSaveData, saveGameData } from './game/save'
 import coinIcon from './assets/images/resources/coin.png'
 import gemIcon from './assets/images/resources/gem.png'
 import { createBattleArea } from './ui/battleArea'
 import {
   createHeroPanel,
+  createSettingsPanel,
   createShopPanel,
   createWeaponModal,
   createWeaponPanel,
@@ -22,8 +23,10 @@ let bossRemainingSeconds = null
 let toastTimer = null
 let shopTimer = null
 let lastShopTick = Date.now()
+let isResettingGame = false
 
 function saveOnly() {
+  if (isResettingGame) return
   saveGameData(saveData)
 }
 
@@ -83,7 +86,7 @@ function renderApp() {
           <button class="tab-btn ${currentTab === 'hero' ? 'active' : ''}" id="heroTabBtn" type="button">英雄</button>
           <button class="tab-btn ${currentTab === 'weapon' ? 'active' : ''}" id="weaponTabBtn" type="button">武器</button>
           <button class="tab-btn ${currentTab === 'shop' ? 'active' : ''}" id="shopTabBtn" type="button">商店</button>
-          <button class="tab-btn" type="button">設定</button>
+          <button class="tab-btn ${currentTab === 'settings' ? 'active' : ''}" id="settingsTabBtn" type="button">設定</button>
         </nav>
 
         <section class="panel-area" id="panelArea"></section>
@@ -154,6 +157,8 @@ function renderPanel() {
     panelArea.innerHTML = createHeroPanel(saveData)
   } else if (currentTab === 'shop') {
     panelArea.innerHTML = createShopPanel(saveData)
+  } else if (currentTab === 'settings') {
+    panelArea.innerHTML = createSettingsPanel()
   } else {
     panelArea.innerHTML = createWeaponPanel(saveData)
   }
@@ -222,6 +227,7 @@ function updateTabActiveState() {
   const heroTabBtn = document.querySelector('#heroTabBtn')
   const weaponTabBtn = document.querySelector('#weaponTabBtn')
   const shopTabBtn = document.querySelector('#shopTabBtn')
+  const settingsTabBtn = document.querySelector('#settingsTabBtn')
 
   if (heroTabBtn) {
     heroTabBtn.classList.toggle('active', currentTab === 'hero')
@@ -233,6 +239,10 @@ function updateTabActiveState() {
 
   if (shopTabBtn) {
     shopTabBtn.classList.toggle('active', currentTab === 'shop')
+  }
+
+  if (settingsTabBtn) {
+    settingsTabBtn.classList.toggle('active', currentTab === 'settings')
   }
 }
 
@@ -260,6 +270,7 @@ function bindEvents() {
   const heroTabBtn = document.querySelector('#heroTabBtn')
   const weaponTabBtn = document.querySelector('#weaponTabBtn')
   const shopTabBtn = document.querySelector('#shopTabBtn')
+  const settingsTabBtn = document.querySelector('#settingsTabBtn')
   const bossChallengeBtn = document.querySelector('#bossChallengeBtn')
 
   if (heroTabBtn) {
@@ -283,6 +294,13 @@ function bindEvents() {
     })
   }
 
+  if (settingsTabBtn) {
+    settingsTabBtn.addEventListener('click', () => {
+      currentTab = 'settings'
+      renderPanel()
+    })
+  }
+
   if (bossChallengeBtn) {
     bossChallengeBtn.addEventListener('click', () => {
       challengeNextBoss()
@@ -293,6 +311,7 @@ function bindEvents() {
 function bindPanelEvents() {
   const buyHeroBtn = document.querySelector('#buyHeroBtn')
   const claimShopGemBtn = document.querySelector('#claimShopGemBtn')
+  const resetGameBtn = document.querySelector('#resetGameBtn')
   const weaponButtons = document.querySelectorAll('.action-btn[data-weapon-id]')
 
   if (buyHeroBtn) {
@@ -327,6 +346,18 @@ function bindPanelEvents() {
       saveData.shop.gemReward += GAME_CONFIG.shopGemRewardIncrease
       saveData.shop.remainingSeconds = GAME_CONFIG.shopClaimCooldownSeconds
       persistAndRefresh()
+    })
+  }
+
+  if (resetGameBtn) {
+    resetGameBtn.addEventListener('click', () => {
+      const confirmed = confirm('確定要重置全部進度嗎？')
+
+      if (!confirmed) return
+
+      isResettingGame = true
+      resetSaveData()
+      window.location.reload()
     })
   }
 
@@ -387,6 +418,8 @@ function bindWeaponModalEvents() {
 }
 
 window.addEventListener('beforeunload', () => {
+  if (isResettingGame) return
+
   saveData.battle = getBattleState() ?? saveData.battle
   saveOnly()
 })

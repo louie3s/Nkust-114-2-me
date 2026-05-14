@@ -92,3 +92,7 @@ export function loadSaveData() {
 export function saveGameData(data) {
   localStorage.setItem(SAVE_KEY, JSON.stringify(data))
 }
+
+export function resetSaveData() {
+  localStorage.removeItem(SAVE_KEY)
+}

@@ -375,6 +375,31 @@ body {
   box-shadow: 0 3px 0 #323b43;
 }
 
+.settings-panel {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 210px;
+}
+
+.reset-game-btn {
+  width: min(100%, 280px);
+  height: 54px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(to bottom, #ff7c66, #c53428);
+  color: white;
+  cursor: pointer;
+  font-size: 22px;
+  font-weight: bold;
+  box-shadow: 0 4px 0 #7d1e18;
+}
+
+.reset-game-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #7d1e18;
+}
+
 .buy-hero-btn {
   border: none;
   border-radius: 12px;
